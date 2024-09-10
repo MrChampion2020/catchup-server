@@ -24,18 +24,13 @@ const upload = multer({
   limits: { fileSize: 5000000 }, // Limit file size to 5MB
 }).array('images', 5); // Allow multiple images (up to 5)
 
+
 const createPost = async (req, res) => {
   try {
     const { title, content, userId } = req.body;
 
-    /*if (!(title && content)) {
-      throw new Error("All input required");
-    }*/
-
     if (cooldown.has(userId)) {
-      throw new Error(
-        "You are posting too frequently. Please try again shortly."
-      );
+      throw new Error("You are posting too frequently. Please try again shortly.");
     }
 
     cooldown.add(userId);
@@ -43,17 +38,20 @@ const createPost = async (req, res) => {
       cooldown.delete(userId);
     }, 60000);
 
-    // Handle image uploads
     upload(req, res, async (err) => {
       if (err) {
         return res.status(500).json({ message: 'Error uploading file' });
       }
-
-      const imagePaths = req.files.map(file => ({
-        filename: file.filename,
-        path: `/uploads/${file.filename}`,
-      }));
-
+    
+      console.log('Files:', req.files); // Log files to debug
+    
+      const imagePaths = req.files
+        ? req.files.map(file => ({
+            filename: file.filename,
+            path: `/uploads/${file.filename}`,
+          }))
+        : [];
+    
       // Create the post
       const post = await Post.create({
         title,
@@ -61,13 +59,15 @@ const createPost = async (req, res) => {
         poster: userId,
         images: imagePaths, // Attach the uploaded images to the post
       });
-
+    
       res.json(post);
     });
+    
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
 };
+
 
 /*
 const createPost = async (req, res) => {
