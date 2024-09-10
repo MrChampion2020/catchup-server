@@ -4,72 +4,10 @@ const User = require("../models/User");
 const Comment = require("../models/Comment");
 const PostLike = require("../models/PostLike");
 const paginate = require("../util/paginate");
-const multer = require('multer');
-const path = require('path');
 const cooldown = new Set();
-
 
 USER_LIKES_PAGE_SIZE = 9;
 
-// Set up multer for image upload
-const storage = multer.diskStorage({
-  destination: './uploads/',
-  filename: (req, file, cb) => {
-    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
-  },
-});
-
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 5000000 }, // Limit file size to 5MB
-}).array('images', 5); // Allow multiple images (up to 5)
-
-
-const createPost = async (req, res) => {
-  try {
-    const { title, content, userId } = req.body;
-
-    if (cooldown.has(userId)) {
-      throw new Error("You are posting too frequently. Please try again shortly.");
-    }
-
-    cooldown.add(userId);
-    setTimeout(() => {
-      cooldown.delete(userId);
-    }, 60000);
-
-    upload(req, res, async (err) => {
-      if (err) {
-        return res.status(500).json({ message: 'Error uploading file' });
-      }
-    
-      console.log('Files:', req.files); // Log files to debug
-    
-      const imagePaths = req.files
-        ? req.files.map(file => ({
-            filename: file.filename,
-            path: `/uploads/${file.filename}`,
-          }))
-        : [];
-    
-      // Create the post
-      const post = await Post.create({
-        title,
-        content,
-        poster: userId,
-        images: imagePaths, // Attach the uploaded images to the post
-      });
-    
-      res.json(post);
-    });
-    
-  } catch (err) {
-    return res.status(400).json({ error: err.message });
-  }
-};
-
-
-/*
 const createPost = async (req, res) => {
   try {
     const { title, content, userId } = req.body;
@@ -100,9 +38,7 @@ const createPost = async (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 };
-*/
 
-/*
 const getPost = async (req, res) => {
   try {
     const postId = req.params.id;
@@ -131,48 +67,6 @@ const getPost = async (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 };
-*/
-
-const getPost = async (req, res) => {
-  try {
-    const { userId } = req.body;
-    let { page, sortBy, author, search, liked } = req.query;
-
-    if (!sortBy) sortBy = "-createdAt";
-    if (!page) page = 1;
-
-    let posts = await Post.find()
-      .populate("poster", "-password")
-      .sort(sortBy)
-      .lean();
-
-    if (author) {
-      posts = posts.filter((post) => post.poster.username === author);
-    }
-
-    if (search) {
-      posts = posts.filter((post) =>
-        post.title.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    const count = posts.length;
-
-    posts = paginate(posts, 10, page);
-
-    if (userId) {
-      await setLiked(posts, userId);
-    }
-
-    await enrichWithUserLikePreview(posts);
-
-    return res.json({ data: posts, count });
-  } catch (err) {
-    console.log(err.message);
-    return res.status(400).json({ error: err.message });
-  }
-};
-
 
 const updatePost = async (req, res) => {
   try {
@@ -299,7 +193,7 @@ const getUserLikedPosts = async (req, res) => {
   }
 };
 
-/*const getPosts = async (req, res) => {
+const getPosts = async (req, res) => {
   try {
     const { userId } = req.body;
 
@@ -315,47 +209,6 @@ const getUserLikedPosts = async (req, res) => {
 
     if (author) {
       posts = posts.filter((post) => post.poster.username == author);
-    }
-
-    if (search) {
-      posts = posts.filter((post) =>
-        post.title.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    const count = posts.length;
-
-    posts = paginate(posts, 10, page);
-
-    if (userId) {
-      await setLiked(posts, userId);
-    }
-
-    await enrichWithUserLikePreview(posts);
-
-    return res.json({ data: posts, count });
-  } catch (err) {
-    console.log(err.message);
-    return res.status(400).json({ error: err.message });
-  }
-};
-*/
-
-const getPosts = async (req, res) => {
-  try {
-    const { userId } = req.body;
-    let { page, sortBy, author, search, liked } = req.query;
-
-    if (!sortBy) sortBy = "-createdAt";
-    if (!page) page = 1;
-
-    let posts = await Post.find()
-      .populate("poster", "-password")
-      .sort(sortBy)
-      .lean();
-
-    if (author) {
-      posts = posts.filter((post) => post.poster.username === author);
     }
 
     if (search) {
