@@ -28,9 +28,9 @@ const createPost = async (req, res) => {
   try {
     const { title, content, userId } = req.body;
 
-    if (!(title && content)) {
+    /*if (!(title && content)) {
       throw new Error("All input required");
-    }
+    }*/
 
     if (cooldown.has(userId)) {
       throw new Error(
